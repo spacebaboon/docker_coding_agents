@@ -1,0 +1,39 @@
+services:
+  claude:
+    build: .
+    image: claude-code-playwright
+    container_name: claude-pw
+    user: claude
+    stdin_open: true
+    tty: true
+    environment:
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    volumes:
+      # Mount projects as the primary workspace
+      - ../projects:/workspace
+      # Persist Claude settings/history between sessions
+      - claude-config:/home/claude/.claude
+      # Git & SSH configs
+      - ~/.gitconfig:/home/claude/.gitconfig:ro
+      - ~/.ssh:/home/claude/.ssh:ro
+    working_dir: /workspace
+    # Keep container alive for VS Code attach
+    command: sleep infinity
+    network_mode: bridge
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # 2gb shared memory prevents Chromium OOM crashes in Docker
+    shm_size: '2gb'
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+volumes:
+  claude-config:
