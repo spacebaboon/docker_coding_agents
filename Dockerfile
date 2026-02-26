@@ -67,7 +67,7 @@ RUN echo '{\n\
       ]\n\
     }\n\
   }\n\
-}' > /home/claude/.claude.json
+}' > /home/claude/.claude/.config.json
 
 WORKDIR /workspace
 
