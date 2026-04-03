@@ -19,7 +19,7 @@ RUN npm install -g \
 
 # Install useful CLI tools
 RUN apt-get update \
-    && apt-get install -y lsof procps \
+    && apt-get install -y lsof procps unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a stable symlink to the Playwright-bundled Chromium binary
@@ -38,6 +38,13 @@ RUN chown claude:claude /home/claude/.aliases.sh \
     && echo '[ -f ~/.aliases.sh ] && . ~/.aliases.sh' >> /home/claude/.bashrc
 
 USER claude
+
+ENV NPM_CONFIG_PREFIX=/home/claude/.npm-global
+ENV PATH=$PATH:/home/claude/.npm-global/bin
+RUN mkdir -p /home/claude/.npm-global
+
+# Install Bun as the claude user (will go to /home/claude/.bun)
+RUN curl -fsSL https://bun.sh/install | bash
 
 # Create config directories
 RUN mkdir -p /home/claude/.claude
