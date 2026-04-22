@@ -9,18 +9,22 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Claude Code, Playwright MCP, Chrome DevTools MCP, Codex CLI, and Gemini CLI
+# Install Claude Code, Playwright MCP, Chrome DevTools MCP, Codex CLI, Gemini CLI, and HumanLayer
 RUN npm install -g \
     @anthropic-ai/claude-code@latest \
     @playwright/mcp@latest \
     chrome-devtools-mcp@latest \
     @openai/codex@latest \
-    @google/gemini-cli@latest
+    @google/gemini-cli@latest \
+    humanlayer@latest
 
-# Install useful CLI tools
+# Install useful CLI tools including micro editor
 RUN apt-get update \
-    && apt-get install -y lsof procps unzip \
+    && apt-get install -y lsof procps unzip micro curl less vim make git-crypt \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI (for docker-in-docker via socket mount)
+RUN curl -fsSL https://get.docker.com | sh
 
 # Create a stable symlink to the Playwright-bundled Chromium binary
 # so chrome-devtools-mcp (Puppeteer-based) can find it via --executable-path
@@ -48,6 +52,10 @@ RUN curl -fsSL https://bun.sh/install | bash
 
 # Create config directories
 RUN mkdir -p /home/claude/.claude
+RUN mkdir -p /home/claude/.config/micro
+
+# Set micro colorscheme to a light theme
+RUN echo '{"colorscheme": "bubblegum"}' > /home/claude/.config/micro/settings.json
 
 # Configure MCP servers for Claude Code:
 # playwright: browser automation via accessibility snapshots

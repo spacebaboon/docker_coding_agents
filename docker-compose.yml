@@ -8,6 +8,8 @@ services:
     tty: true
     environment:
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    group_add:
+      - "0" # root group — required for Docker socket access on Docker Desktop for Mac
     volumes:
       # Mount projects as the primary workspace
       - ../projects:/workspace
@@ -16,6 +18,14 @@ services:
       # Git & SSH configs
       - ~/.gitconfig:/home/claude/.gitconfig:ro
       - ~/.ssh:/home/claude/.ssh:ro
+      # Humanlayer slash commands (read-only, managed on Mac)
+      - ~/.claude/commands:/home/claude/.claude/commands:ro
+      # Thoughts: persistent AI notes, synced with Mac
+      - ~/thoughts:/home/claude/thoughts
+      # Prompts: history of CC prompts, synced with Mac
+      - ~/prompts:/home/claude/prompts
+      # Mount Docker socket for docker-in-docker
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /workspace
     # Keep container alive for VS Code attach
     command: sleep infinity
@@ -23,7 +33,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # 2gb shared memory prevents Chromium OOM crashes in Docker
-    shm_size: '2gb'
+    shm_size: "2gb"
     cap_drop:
       - ALL
     cap_add:
