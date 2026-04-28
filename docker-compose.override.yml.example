@@ -1,0 +1,26 @@
+# Per-user overrides for docker-compose.yml.
+#
+# Copy to docker-compose.override.yml (git-ignored) and edit for your machine.
+# Docker Compose auto-merges this file with docker-compose.yml on `up`/`build`.
+#
+# Primary use case: add container-only named volumes for node_modules of
+# JS/TS projects. Bind-mounting node_modules from macOS/Windows into Linux
+# is painfully slow because of the cross-OS filesystem tax on hundreds of
+# thousands of small files. A named volume keeps node_modules on the
+# container's native ext4 filesystem — orders of magnitude faster.
+#
+# After editing, run `npm/bun install` inside the container once to populate
+# each named volume.
+
+services:
+  claude:
+    volumes:
+      # Repeat this pattern once per project that has heavy node_modules.
+      # Path on the left = volume name, path on the right = path INSIDE the
+      # container (relative to /workspace, which is your projects dir).
+      - my-project-node-modules:/workspace/my-project/node_modules
+      # - another-project-node-modules:/workspace/subdir/another-project/node_modules
+
+volumes:
+  my-project-node-modules:
+  # another-project-node-modules:

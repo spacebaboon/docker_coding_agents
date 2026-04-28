@@ -11,8 +11,11 @@ services:
     group_add:
       - "0" # root group — required for Docker socket access on Docker Desktop for Mac
     volumes:
-      # Mount projects as the primary workspace
-      - ../projects:/workspace
+      # Mount projects as the primary workspace (override PROJECTS_DIR in .env)
+      - ${PROJECTS_DIR:-../projects}:/workspace
+      # Per-project container-only node_modules volumes (for native-speed I/O on
+      # macOS/Windows) belong in docker-compose.override.yml — see
+      # docker-compose.override.yml.example.
       # Persist Claude settings/history between sessions
       - claude-config:/home/claude/.claude
       # Git & SSH configs
@@ -43,7 +46,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 16G
 
 volumes:
   claude-config:

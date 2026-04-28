@@ -20,26 +20,36 @@ RUN npm install -g \
 
 # Install useful CLI tools including micro editor
 RUN apt-get update \
-    && apt-get install -y lsof procps unzip micro curl less vim make git-crypt \
+    && apt-get install -y lsof procps unzip micro curl less vim make git-crypt bash-completion sudo gettext-base openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Docker CLI (for docker-in-docker via socket mount)
 RUN curl -fsSL https://get.docker.com | sh
+
+# Install AWS CLI v2 (official installer — supports both x86_64 and aarch64)
+RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip \
+    && unzip -q /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/awscliv2.zip /tmp/aws
 
 # Create a stable symlink to the Playwright-bundled Chromium binary
 # so chrome-devtools-mcp (Puppeteer-based) can find it via --executable-path
 RUN ln -sf $(find /ms-playwright -name chrome -path '*/chrome-linux/*' -type f | head -1) \
     /usr/local/bin/chromium-browser
 
-# Create non-root user for safety
-RUN useradd -m -s /bin/bash claude
+# Create non-root user for safety, with passwordless sudo for install scripts
+RUN useradd -m -s /bin/bash claude \
+    && echo 'claude ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/claude \
+    && chmod 440 /etc/sudoers.d/claude
 
 # Copy aliases file and source it from .bashrc (works for all shell sessions)
 COPY aliases.sh /home/claude/.aliases.sh
 RUN chown claude:claude /home/claude/.aliases.sh \
     && echo '' >> /home/claude/.bashrc \
     && echo '# Source custom aliases' >> /home/claude/.bashrc \
-    && echo '[ -f ~/.aliases.sh ] && . ~/.aliases.sh' >> /home/claude/.bashrc
+    && echo '[ -f ~/.aliases.sh ] && . ~/.aliases.sh' >> /home/claude/.bashrc \
+    && echo '# Enable bash completion (git branches, etc.)' >> /home/claude/.bashrc \
+    && echo '[ -f /etc/bash_completion ] && . /etc/bash_completion' >> /home/claude/.bashrc
 
 USER claude
 

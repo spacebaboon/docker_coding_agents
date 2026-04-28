@@ -25,10 +25,18 @@ export LESS_TERMCAP_ue=$'\e[0m'
 export LESS_TERMCAP_us=$'\e[1;32m'
 
 # Colored bash prompt: user@host in green, cwd in blue, git branch in yellow
+# \w is trimmed to the last 2 path components via PROMPT_DIRTRIM.
+PROMPT_DIRTRIM=2
 __git_branch() {
-  git branch 2>/dev/null | sed -n 's/^\* \(.*\)/ (\1)/p'
+  local b
+  b=$(git branch --show-current 2>/dev/null) || return
+  [ -z "$b" ] && return
+  if [ ${#b} -gt 20 ]; then
+    b="${b:0:20}…"
+  fi
+  printf ' (%s)' "$b"
 }
-PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[1;33m\]$(__git_branch)\[\e[0m\]\$ '
+PS1='\[\e[1;32m\]\u\[\e[0m\]:\[\e[1;34m\]\w\[\e[1;33m\]$(__git_branch)\[\e[0m\]\$ '
 
 # General
 alias ..='cd ..'
