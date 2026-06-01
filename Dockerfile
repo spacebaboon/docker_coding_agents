@@ -43,6 +43,20 @@ RUN apt-get update \
     && ln -sf "$(which fdfind)" /usr/local/bin/fd \
     && ln -sf "$(which batcat)" /usr/local/bin/bat
 
+# Python toolchain for backend (laas-api) work — the Playwright base image is
+# Node-only. python-is-python3 puts `python` on PATH alongside `python3`.
+# Note: Ubuntu Noble marks the system Python as externally managed (PEP 668),
+# so prefer uv (below) for installs rather than `pip install` into the system.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        python3 python3-venv python3-pip python-is-python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# uv (Astral) — copied from the official image: fast, multi-arch, reproducible,
+# no install script. Provides `uv` and `uvx`; uv can also manage Python versions
+# itself via `uv python install`.
+COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /uvx /usr/local/bin/
+
 # Install Docker CLI (for docker-in-docker via socket mount)
 RUN curl -fsSL https://get.docker.com | sh
 
