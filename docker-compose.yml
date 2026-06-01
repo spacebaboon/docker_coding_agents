@@ -1,5 +1,6 @@
 services:
   claude:
+    init: true
     build: .
     image: claude-code-playwright
     container_name: claude-pw
@@ -8,6 +9,7 @@ services:
     tty: true
     environment:
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      - GITHUB_PERSONAL_ACCESS_TOKEN
     group_add:
       - "0" # root group — required for Docker socket access on Docker Desktop for Mac
     volumes:
@@ -23,6 +25,15 @@ services:
       - ~/.ssh:/home/claude/.ssh:ro
       # Humanlayer slash commands (read-only, managed on Mac)
       - ~/.claude/commands:/home/claude/.claude/commands:ro
+      # Custom user-level Claude memory, managed on the Mac and gitignored in this
+      # repo. Bind-mounted (not baked into the image) on purpose: the claude-config
+      # named volume above mounts over /home/claude/.claude, so a COPY into that
+      # path at build time would be shadowed. This more-specific mount overlays the
+      # named volume and tracks the host file live.
+      # IMPORTANT: this file must exist on the host before `up`, otherwise Docker
+      # creates an empty *directory* at this path. Keep a committed CLAUDE.md.example
+      # and copy it to CLAUDE.md on first setup.
+      - ./CLAUDE.md:/home/claude/.claude/CLAUDE.md:ro
       # Thoughts: persistent AI notes, synced with Mac
       - ~/thoughts:/home/claude/thoughts
       # Prompts: history of CC prompts, synced with Mac

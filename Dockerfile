@@ -1,8 +1,16 @@
 # Base: Official Playwright image with browsers pre-installed
-FROM mcr.microsoft.com/playwright:v1.58.2-noble
+FROM mcr.microsoft.com/playwright:v1.60.0-noble
 
 # Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
+
+# Disable Claude Code's background self-updater. In a container the global
+# install lives in a root-owned prefix, so the autoupdater fails partway and
+# leaves a stale ~/.claude/scheduled_tasks.lock ("Another instance is currently
+# performing an update"). Updates here happen by rebuilding the image instead.
+# Note: this stops the background check only; `claude update`/`claude install`
+# still work. Use DISABLE_UPDATES=1 instead to block those too.
+ENV DISABLE_AUTOUPDATER=1
 
 # Install Node.js 22 (Playwright image has 18, we want newer for Claude Code)
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
@@ -10,13 +18,22 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Claude Code, Playwright MCP, Chrome DevTools MCP, Codex CLI, Gemini CLI, and HumanLayer
+# @latest pulls the newest version at build time. Opus 4.8 needs Claude Code
+# >= 2.1.154, so rebuild this image to pick it up (or pin a version here).
 RUN npm install -g \
     @anthropic-ai/claude-code@latest \
     @playwright/mcp@latest \
     chrome-devtools-mcp@latest \
     @openai/codex@latest \
     @google/gemini-cli@latest \
-    humanlayer@latest
+    humanlayer@latest \
+    typescript@latest \
+    typescript-language-server@latest \
+    pyright@latest
+
+
+# pnpm via Corepack
+RUN corepack enable && corepack prepare pnpm@11.5.0 --activate
 
 # Install useful CLI tools including micro editor
 RUN apt-get update \
@@ -79,32 +96,21 @@ RUN mkdir -p /home/claude/.config/micro
 # Set micro colorscheme to a light theme
 RUN echo '{"colorscheme": "bubblegum"}' > /home/claude/.config/micro/settings.json
 
-# Configure MCP servers for Claude Code:
-# playwright: browser automation via accessibility snapshots
-# chrome-devtools: performance profiling, network inspection, console debugging
-RUN echo '{\n\
-  "mcpServers": {\n\
-    "playwright": {\n\
-      "command": "npx",\n\
-      "args": [\n\
-        "@playwright/mcp",\n\
-        "--browser", "chromium",\n\
-        "--headless",\n\
-        "--no-sandbox"\n\
-      ]\n\
-    },\n\
-    "chrome-devtools": {\n\
-      "command": "npx",\n\
-      "args": [\n\
-        "chrome-devtools-mcp",\n\
-        "--headless",\n\
-        "--isolated",\n\
-        "--executable-path", "/usr/local/bin/chromium-browser",\n\
-        "--no-usage-statistics"\n\
-      ]\n\
-    }\n\
-  }\n\
-}' > /home/claude/.claude/.config.json
+# Configure MCP servers for Claude Code.
+# These go in ~/.claude.json (user scope), NOT ~/.claude/.config.json — the latter
+# is not a path Claude Code reads, and ~/.claude is mounted over by the
+# claude-config named volume anyway. ~/.claude.json is a *sibling* of that
+# directory, so it is not shadowed.
+# Servers (see claude.json for definitions):
+#   playwright, chrome-devtools : local stdio (npx)
+#   github                      : stdio via the mounted Docker socket; PAT passed
+#                                 through GITHUB_PERSONAL_ACCESS_TOKEN, read-only
+#   atlassian, figma, locize    : remote OAuth; authenticate once with /mcp
+# No secrets live in this file (PAT is injected at runtime, the rest use OAuth),
+# so it is safe to commit. NOTE: this is baked into the image, so a container
+# recreate resets ~/.claude.json to these definitions; treat claude.json as the
+# source of truth and re-run /mcp auth for the OAuth servers if needed.
+COPY --chown=claude:claude claude.json /home/claude/.claude.json
 
 WORKDIR /workspace
 

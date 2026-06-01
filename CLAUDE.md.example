@@ -1,0 +1,67 @@
+# Claude Code agent instructions
+
+You are a Claude Code agent running inside a Docker container, launched from a host machine.
+
+> _Replace this section with a brief description of the system you are working on: what it is, who its users are, and any high-level domain context the agent should keep in mind. Keep it short._
+
+Follow the instructions in this file in preference to project-specific CLAUDE.md files.
+
+## Repository structure
+
+> _List the repositories or projects the agent works across, each with a one-line description and its tech stack. Note anything that must run on the host rather than inside the container. For example:_
+>
+> - `project-ui`: the web frontend. [framework / language].
+> - `project-api`: the backend service. [framework / language].
+> - `project-infra`: deployment and infrastructure.
+
+## Environment and boundaries
+
+> _Adjust these to match how much freedom you want to give the agent. The defaults below are a conservative starting point._
+
+- Version control access is read-only by default. The agent may inspect code, build status, and PR comments, and may create local commits, but must not push, open or modify PRs, or post comments. (Loosen this if you want the agent to push or open PRs.)
+- If a referenced tool or MCP server (see Tooling) is not available in this session, tell me rather than falling back to a different mechanism.
+
+## Code style
+
+- Favour YAGNI: keep things minimal and simple. Apply DRY for substantial, repeated duplication that is clearly worth removing, but avoid over-generic code with too many parameters.
+- Use TDD. Write unit tests first against the specs, confirm they fail (to avoid false positives), then write the production code to make them pass. Do not write all the tests up front when there would be many; let the code evolve as you add tests.
+- Do not add comments to explain changes. Readers care about the current state, not the history. Add comments only where the code is otherwise unclear.
+- Apply the boy scout principle liberally: when you change a file, tidy nearby code smells. Do not do this in files you are not otherwise touching.
+
+## React (remove this section if you do not use React)
+
+- Favour best-practice approaches over copying existing code patterns. For example, avoid using useEffect for local state management, and avoid useMemo used only to cache JSX (unless the React Compiler is not enabled and that memoization is load-bearing for a measured performance issue).
+
+## Git and commits
+
+- Use as few commits as is sensible. Do not make overly granular commits; squash into sensible groupings.
+- Keep commit messages terse but complete. Use bullet lists, one sentence per item (two only if one cannot convey the important information). Do not add yourself as co-author.
+- When writing prose such as PRs or tickets, never use em-dashes; use a single hyphen instead.
+
+## Tooling
+
+> _List the MCP servers and tools configured for your container, and when the agent should use each. The list below matches the servers in this repo's `claude.json`; trim it to what you actually use._
+
+- GitHub MCP server: use this for repository inspection rather than the `gh` CLI. (Read-only, per the boundaries above.)
+- Issue tracker MCP server (for example Jira): use when given a ticket reference.
+- Design MCP server (for example Figma): use when given a design reference.
+- Browser MCP server (for example Playwright): use to test UI changes.
+- Language server (for example TypeScript, Pyright): use for symbol navigation, find-references, and type information where it is more accurate than text search. Use grep/ripgrep for plain text or pattern search; do not use the LSP for broad text sweeps.
+
+## Internationalisation (remove if not applicable)
+
+General principles worth keeping:
+
+- Do not delete translation strings.
+- Do not update strings without my explicit permission first.
+- Do not translate automatically without my explicit permission.
+
+> _Add your project-specific translation workflow here: which translation tool or MCP server you use, the source of truth for copy, language conventions, and where reference text lives._
+
+## Workflows and outputs
+
+> _These are general conventions you can keep or adjust. Paths assume your projects are mounted under `/workspace`._
+
+- Screenshots are in `/workspace/screenshots/`. If I do not name a file, read the most recently written one (or more, depending on how many I name).
+- Work plans: output the plan in your response, and also write it to `/workspace/plans/`. Do not write plan files into the project directories. Create the directory if it does not exist.
+- Code reviews of PRs: output the results in your response, and also write them as an `.md` file in `/workspace/reviews/`. Create the directory if it does not exist.

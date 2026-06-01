@@ -1,3 +1,18 @@
-workspace/
-.env
-docker-compose.override.yml
+# --- Claude Code dev container ---
+
+# Personal working copies (bind-mounted / baked into the container). Each dev
+# keeps their own; the committed *.example files are the shared baseline.
+/CLAUDE.md
+/claude.json
+
+# Kept TRACKED (no secrets in either):
+#   CLAUDE.md.example    -> agent-memory baseline; copy to CLAUDE.md on first setup
+#   claude.json.example  -> MCP config-as-code; PAT injected at runtime, rest use OAuth
+# (Noted here only as a reminder; they are intentionally NOT ignored.)
+
+# Environment file: holds GITHUB_PERSONAL_ACCESS_TOKEN, PROJECTS_DIR, etc.
+/.env
+
+# Machine-specific compose override (per-project node_modules volumes, etc.).
+# Commit docker-compose.override.yml.example instead.
+/docker-compose.override.yml
