@@ -37,8 +37,11 @@ RUN corepack enable && corepack prepare pnpm@11.5.0 --activate
 
 # Install useful CLI tools including micro editor
 RUN apt-get update \
-    && apt-get install -y lsof procps unzip micro curl less vim make git-crypt bash-completion sudo gettext-base openssl \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y lsof procps unzip micro curl less vim make git-crypt bash-completion sudo gettext-base openssl ripgrep jq fd-find tree wget bat git-delta \
+    && rm -rf /var/lib/apt/lists/* \
+    # Ubuntu ships these under alternate binary names; add the expected ones
+    && ln -sf "$(which fdfind)" /usr/local/bin/fd \
+    && ln -sf "$(which batcat)" /usr/local/bin/bat
 
 # Install Docker CLI (for docker-in-docker via socket mount)
 RUN curl -fsSL https://get.docker.com | sh
@@ -48,6 +51,12 @@ RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -
     && unzip -q /tmp/awscliv2.zip -d /tmp \
     && /tmp/aws/install \
     && rm -rf /tmp/awscliv2.zip /tmp/aws
+
+# Install yq (mikefarah, Go) — single release binary, arch-aware
+RUN ARCH="$(dpkg --print-architecture)" \
+    && curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${ARCH}" \
+        -o /usr/local/bin/yq \
+    && chmod +x /usr/local/bin/yq
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg \
@@ -83,11 +92,14 @@ RUN chown claude:claude /home/claude/.aliases.sh \
 USER claude
 
 ENV NPM_CONFIG_PREFIX=/home/claude/.npm-global
-ENV PATH=$PATH:/home/claude/.npm-global/bin
+ENV PATH=$PATH:/home/claude/.npm-global/bin:/home/claude/.local/bin
 RUN mkdir -p /home/claude/.npm-global
 
 # Install Bun as the claude user (will go to /home/claude/.bun)
 RUN curl -fsSL https://bun.sh/install | bash
+
+# Install uv (Astral) as the claude user — installs to ~/.local/bin
+RUN curl -fsSL https://astral.sh/uv/install.sh | sh
 
 # Create config directories
 RUN mkdir -p /home/claude/.claude

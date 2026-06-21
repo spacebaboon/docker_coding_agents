@@ -47,6 +47,11 @@ Follow the instructions in this file in preference to project-specific CLAUDE.md
 - Design MCP server (for example Figma): use when given a design reference.
 - Browser MCP server (for example Playwright): use to test UI changes.
 - Language server (for example TypeScript, Pyright): use for symbol navigation, find-references, and type information where it is more accurate than text search. Use grep/ripgrep for plain text or pattern search; do not use the LSP for broad text sweeps.
+- CLI tools available in the container; prefer them where they fit:
+  - `rg` (ripgrep) for text/pattern search and `fd` for finding files, in preference to `grep`/`find`.
+  - `jq` for JSON and `yq` for YAML/TOML when reading or transforming structured data.
+  - `uv`/`uvx` for all Python work (running, dependencies, venvs); it manages its own interpreters, so do not assume a system `python3`.
+  - `delta` for readable git diffs, `bat` for syntax-highlighted file viewing, and `tree` for directory overviews.
 
 ## Internationalisation (remove if not applicable)
 
