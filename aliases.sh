@@ -80,3 +80,55 @@ lp() {
 rp() {
   ls -lt "$PROMPT_DIR"/*.md 2>/dev/null | head -20
 }
+
+# Create a git worktree as a sibling of the main checkout, named after the branch.
+# Handles git-crypt key linking automatically. Needs bash or zsh.
+# Usage: wt <branch-name> [--install]
+wt() {
+  local branch="$1"
+  if [ -z "$branch" ]; then
+    echo "usage: wt <branch-name> [--install]" >&2
+    return 1
+  fi
+
+  # directory name = branch with any slashes flattened (slashes would nest dirs)
+  local dirname="${branch//\//-}"
+
+  # place it next to the MAIN checkout, wherever we are in the repo
+  local toplevel parent target
+  toplevel="$(git rev-parse --show-toplevel)" || return 1
+  parent="$(dirname "$toplevel")"
+  target="$parent/$dirname"
+
+  if [ -e "$target" ]; then
+    echo "wt: '$target' already exists" >&2
+    return 1
+  fi
+
+  # create WITHOUT checking out, so git-crypt's smudge filter doesn't run
+  # before we've linked the key into the new worktree's git dir
+  if git show-ref --quiet --verify "refs/heads/$branch"; then
+    git worktree add --no-checkout "$target" "$branch" || return 1
+  else
+    git worktree add --no-checkout "$target" -b "$branch" || return 1
+  fi
+
+  # link the git-crypt key (only if this repo uses git-crypt)
+  local common_dir wt_gitdir
+  common_dir="$(cd "$(git rev-parse --git-common-dir)" && pwd)"   # absolute
+  wt_gitdir="$(git -C "$target" rev-parse --absolute-git-dir)"
+  if [ -d "$common_dir/git-crypt" ] && [ ! -e "$wt_gitdir/git-crypt" ]; then
+    ln -s "$common_dir/git-crypt" "$wt_gitdir/git-crypt"
+  fi
+
+  # now populate the working tree — smudge can decrypt cleanly
+  git -C "$target" reset --hard || return 1
+
+  cd "$target" || return 1
+
+  if [ "$2" = "--install" ]; then
+    pnpm install
+  else
+    echo "worktree ready at $target — run 'pnpm install' for deps"
+  fi
+}
