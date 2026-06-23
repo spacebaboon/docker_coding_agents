@@ -36,6 +36,11 @@ services:
       # credential helper (see gitconfig / gitconfig-ds, COPYed in the Dockerfile).
       # Humanlayer slash commands (read-only, managed on Mac)
       - ~/.claude/commands:/home/claude/.claude/commands:ro
+      # Host-managed user skills (read-only, managed on Mac), e.g. the spinner-pack
+      # installer. Skills only need to be readable; the spinner skill writes the
+      # chosen verbs to ~/.claude/settings.json (in the claude-config volume), so a
+      # pick persists across rebuilds.
+      - ~/.claude/skills:/home/claude/.claude/skills:ro
       # Custom user-level Claude memory, managed on the Mac and gitignored in this
       # repo. Bind-mounted (not baked into the image) on purpose: the claude-config
       # named volume above mounts over /home/claude/.claude, so a COPY into that

@@ -20,7 +20,7 @@ The goal is to give an agent broad freedom to read, write, and execute inside a 
   - `locize` — translation strings (remote, OAuth)
 - **Runtimes**: Node.js 22, Bun, pnpm (via Corepack), Playwright's bundled Chromium
 - **Tooling**: Docker CLI (via socket mount), GitHub CLI (`gh`), AWS CLI v2, git, git-crypt, TypeScript & Python (Pyright) language servers, micro, vim, less, make, bash-completion
-- **Quality of life**: colored prompt with git branch, prompt-history helpers (`np` / `ep` / `lp` / `rp`), a `dangerclaude` alias for `claude --dangerously-skip-permissions`
+- **Quality of life**: colored prompt with git branch, prompt-history helpers (`np` / `ep` / `lp` / `rp`), a `dangerclaude` alias for `claude --dangerously-skip-permissions`, host-managed user skills mounted in (e.g. swappable [spinner verb packs](#custom-spinner-verbs))
 
 ## Safety model
 
@@ -138,12 +138,46 @@ This file is git-ignored, so each user maintains their own list of projects.
 | `${PROJECTS_DIR}`       | `/workspace`                     | Your projects directory                      |
 | `./CLAUDE.md`           | `/home/claude/.claude/CLAUDE.md` | read-only — user-level agent memory          |
 | `~/.claude/commands`    | `/home/claude/.claude/commands`  | read-only — humanlayer slash commands        |
+| `~/.claude/skills`      | `/home/claude/.claude/skills`    | read-only — host-managed user skills         |
 | `~/thoughts`            | `/home/claude/thoughts`          | persistent agent notes                       |
 | `~/prompts`             | `/home/claude/prompts`           | prompt history (used by `np`/`ep`/`lp`/`rp`) |
 | `/var/run/docker.sock`  | `/var/run/docker.sock`           | docker-in-docker via host daemon             |
 | `claude-config` (named) | `/home/claude/.claude`           | persists Claude settings/history/MCP logins  |
 
 Git auth is not mounted. A directory-aware `~/.gitconfig` is baked into the image (see `gitconfig` / `gitconfig-ds`): it uses the read-only token by default and the read-write token inside the read-write tree. The container holds no SSH keys — SSH-style GitHub remotes are rewritten to HTTPS so the token credential helper authenticates them.
+
+## Custom spinner verbs
+
+The verbs Claude Code shows while it works (`Thinking…`, `Analyzing…`) can be
+swapped for themed packs (pirate, superhero, wizard, …) from
+[awesome-claude-spinners](https://github.com/AlexPl292/awesome-claude-spinners),
+via that repo's `install-spinner` skill.
+
+Skills are managed on the **Mac** and mounted read-only into the container at
+`~/.claude/skills` (the same pattern as the slash commands). Install the skill once
+on the host:
+
+```bash
+npx --yes skills@latest add alexpl292/awesome-claude-spinners \
+    --global --agent claude-code --skill install-spinner --copy --yes
+```
+
+`--copy` writes real files (not symlinks) to `~/.claude/skills/install-spinner`, so
+the read-only container mount resolves them. The skill is then available in both your
+host **and** container Claude Code.
+
+To use it, in a Claude Code session just ask:
+
+```
+install the pirate spinner pack          # or superhero, wizard, cat, …
+remove the spinner pack                  # revert to the defaults
+```
+
+The skill fetches the pack from GitHub and writes the chosen verbs to the
+`spinnerVerbs` field of `~/.claude/settings.json`. Because that file lives in the
+`claude-config` volume, your pick **persists across rebuilds**, and only that one
+field is touched. (Needs the network, which the container has, and a Claude Code
+build new enough to support `spinnerVerbs`.)
 
 ## Writing longer prompts (`np` / `ep` / `lp` / `rp`)
 
