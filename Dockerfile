@@ -84,6 +84,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
+# Token-aware gh wrapper on PATH (shadows /usr/bin/gh) so the read-write/read-only
+# token is selected by working tree in EVERY shell context - not just interactive
+# shells, where a shell function would be (see gh-wrapper.sh).
+COPY gh-wrapper.sh /usr/local/bin/gh
+RUN chmod 0755 /usr/local/bin/gh
+
 # Create a stable symlink to the Playwright-bundled Chromium binary
 # so chrome-devtools-mcp (Puppeteer-based) can find it via --executable-path
 RUN ln -sf $(find /ms-playwright -name chrome -path '*/chrome-linux/*' -type f | head -1) \

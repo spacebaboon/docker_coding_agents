@@ -10,14 +10,14 @@ services:
     environment:
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       # Two scoped GitHub tokens, host-side source of truth in .env. No single
-      # ambient token: the gh wrapper (aliases.sh) and the git credential helper
+      # ambient token: the gh wrapper script (on PATH) and the git credential helper
       # each select the right one by context.
       #   GH_TOKEN_RW - read-write, your push-enabled project tree
       #   GH_TOKEN_RO - read-only, the safe default everywhere else
       - GH_TOKEN_RW
       - GH_TOKEN_RO
-      # Absolute in-container path of the read-write tree; the gh wrapper in
-      # aliases.sh uses it to pick the token.
+      # Absolute in-container path of the read-write tree; the gh wrapper script
+      # uses it to pick the token.
       - GH_RW_TREE
       - CLAUDE_CONFIG_DIR=/home/claude/.claude
     group_add:
