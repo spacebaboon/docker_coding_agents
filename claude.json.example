@@ -23,38 +23,6 @@
         "--no-usage-statistics"
       ]
     },
-    "github-rw": {
-      "type": "stdio",
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e",
-        "GITHUB_PERSONAL_ACCESS_TOKEN",
-        "ghcr.io/github/github-mcp-server"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GH_TOKEN_RW}"
-      }
-    },
-    "github-ro": {
-      "type": "stdio",
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e",
-        "GITHUB_PERSONAL_ACCESS_TOKEN",
-        "-e",
-        "GITHUB_READ_ONLY=1",
-        "ghcr.io/github/github-mcp-server"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GH_TOKEN_RO}"
-      }
-    },
     "atlassian": {
       "type": "sse",
       "url": "https://mcp.atlassian.com/v1/sse"

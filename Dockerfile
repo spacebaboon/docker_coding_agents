@@ -129,11 +129,10 @@ RUN echo '{"colorscheme": "bubblegum"}' > /home/claude/.config/micro/settings.js
 # directory, so it is not shadowed.
 # Servers (see claude.json for definitions):
 #   playwright, chrome-devtools : local stdio (npx)
-#   github-rw / github-ro       : stdio via the mounted Docker socket; each pinned
-#                                 to its scoped PAT (GH_TOKEN_RW / GH_TOKEN_RO)
 #   atlassian, figma, locize    : remote OAuth; authenticate once with /mcp
-# No secrets live in this file (PATs are injected at runtime, the rest use OAuth),
-# so it is safe to commit. NOTE: this is baked into the image, so a container
+# GitHub is not an MCP server here - use the gh CLI (token-aware by directory) to keep
+# session context lean. No secrets live in this file (the remote servers use OAuth), so
+# it is safe to commit. NOTE: this is baked into the image, so a container
 # recreate resets ~/.claude.json to these definitions; treat claude.json as the
 # source of truth and re-run /mcp auth for the OAuth servers if needed.
 COPY --chown=claude:claude claude.json /home/claude/.claude.json

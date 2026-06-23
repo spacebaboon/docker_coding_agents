@@ -1,6 +1,6 @@
 # docker_coding_agents
 
-A Docker container for safely running agentic coding CLIs — **Claude Code**, **OpenAI Codex**, and **Gemini** — alongside MCP servers for **Playwright**, **Chrome DevTools**, **GitHub**, **Jira/Confluence**, **Figma**, and **Locize**.
+A Docker container for safely running agentic coding CLIs — **Claude Code**, **OpenAI Codex**, and **Gemini** — alongside MCP servers for **Playwright**, **Chrome DevTools**, **Jira/Confluence**, **Figma**, and **Locize** (GitHub is handled via the `gh` CLI).
 
 **TL;DR** run Claude Code (et al) in YOLO mode to remove the constant hand-holding of approving commands, but don't let it nuke your home directory or GitHub main.
 
@@ -14,7 +14,6 @@ The goal is to give an agent broad freedom to read, write, and execute inside a 
 - **MCP servers** preconfigured for Claude Code (see [MCP servers](#mcp-servers-claudejson)):
   - `playwright` — browser automation via accessibility snapshots
   - `chrome-devtools` — performance profiling, network inspection, console debugging
-  - `github-rw` / `github-ro` — repositories, issues, PRs, build status via the mounted Docker socket; each pinned to a scoped PAT (read-write project tree vs read-only default)
   - `atlassian` — Jira and Confluence (remote, OAuth)
   - `figma` — design context (remote, OAuth)
   - `locize` — translation strings (remote, OAuth)
@@ -30,7 +29,7 @@ The goal is to give an agent broad freedom to read, write, and execute inside a 
 - **16 GB memory cap**.
 - **No host filesystem access** beyond the directories mounted in `docker-compose.yml`.
 
-Note: the Docker socket is mounted so the agent (and the `github` MCP server) can use docker-in-docker. This is convenient but does give the container control of the host Docker daemon, so it is not a hard security boundary — treat it as part of the trust you extend to the tools you run.
+Note: the Docker socket is mounted so the agent can use docker-in-docker. This is convenient but does give the container control of the host Docker daemon, so it is not a hard security boundary — treat it as part of the trust you extend to the tools you run.
 
 ## Performance
 
@@ -97,12 +96,12 @@ $EDITOR CLAUDE.md
 
 ### MCP servers (`claude.json`)
 
-MCP servers are defined as config-as-code in `claude.json`, copied into the image at `~/.claude.json` — the user-scope location Claude Code actually reads. (`~/.claude/` is shadowed by the `claude-config` volume, so MCP config placed there does not take effect.) No secrets live in it: the GitHub PATs are injected at runtime via `GH_TOKEN_RW` / `GH_TOKEN_RO`, and the remote servers use OAuth.
+MCP servers are defined as config-as-code in `claude.json`, copied into the image at `~/.claude.json` — the user-scope location Claude Code actually reads. (`~/.claude/` is shadowed by the `claude-config` volume, so MCP config placed there does not take effect.) No secrets live in it: the remote servers use OAuth.
 
 `claude.json` is git-ignored (your working copy); `claude.json.example` is the committed baseline — copy it on first setup (`cp claude.json.example claude.json`). **It must exist before you build**, since the Dockerfile copies it into the image.
 
 - **`playwright`**, **`chrome-devtools`** — local stdio servers; work out of the box.
-- **`github-rw`** / **`github-ro`** — two instances of the official `ghcr.io/github/github-mcp-server` as stdio servers over the mounted Docker socket, pinned to `GH_TOKEN_RW` and `GH_TOKEN_RO` respectively (the latter started read-only). Use `github-rw` for the project tree you push to and `github-ro` everywhere else. The first GitHub call pulls that image once.
+- **GitHub** — not exposed as an MCP server by default, to keep session context lean. Use the `gh` CLI instead: it is pre-authenticated and token-aware by directory (read-write in the read-write tree, read-only elsewhere), matching the baked git config. If you want structured MCP access, add `github-rw` / `github-ro` servers running `ghcr.io/github/github-mcp-server` pinned to `GH_TOKEN_RW` / `GH_TOKEN_RO` (the read-only one with `GITHUB_READ_ONLY=1`).
 - **`atlassian`** (Jira/Confluence), **`figma`**, **`locize`** — remote servers using OAuth. Authenticate once per `claude-config` volume: run `claude`, type `/mcp`, and complete the browser login for each. Credentials persist in the volume, so you don't repeat this on rebuild.
 
 Check status any time with `claude mcp list`. Because `~/.claude.json` is baked into the image, recreating the container resets it to whatever `claude.json` held at build time — edit `claude.json` and rebuild to add servers, rather than relying on runtime `claude mcp add`.

@@ -10,8 +10,8 @@ services:
     environment:
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       # Two scoped GitHub tokens, host-side source of truth in .env. No single
-      # ambient token: the MCP servers (claude.json) and the gh/git credential
-      # helpers each select the right one by context.
+      # ambient token: the gh wrapper (aliases.sh) and the git credential helper
+      # each select the right one by context.
       #   GH_TOKEN_RW - read-write, your push-enabled project tree
       #   GH_TOKEN_RO - read-only, the safe default everywhere else
       - GH_TOKEN_RW
