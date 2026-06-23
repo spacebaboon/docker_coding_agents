@@ -79,7 +79,7 @@ Created from `.env.example`. Sets host-side values used by `docker-compose.yml`.
 | `PROJECTS_DIR` | `../projects` | Host directory mounted at `/workspace` inside the container. Can be absolute or relative to `docker-compose.yml`. |
 | `GH_TOKEN_RW`  | _(none)_      | **Read-write** fine-grained PAT, scoped to the project tree you want the agent to push to. |
 | `GH_TOKEN_RO`  | _(none)_      | **Read-only** fine-grained PAT, the safe default for every other repo. |
-| `GH_RW_TREE`   | _(none)_      | Absolute in-container path (under `/workspace`) of the read-write tree. The `gh` wrapper and the baked git config use the read-write token there and the read-only token elsewhere. |
+| `GH_RW_TREE`   | _(none)_      | Absolute in-container path (under `/workspace`) of the read-write tree. The `gh` wrapper script and the baked git config use the read-write token there and the read-only token elsewhere. |
 
 The `.env` file is git-ignored, so each user keeps their own.
 
@@ -248,6 +248,7 @@ docker compose exec claude rm -f /home/claude/.claude/scheduled_tasks.lock
 ├── gitconfig                               # your git config (git-ignored, copied from the example)
 ├── gitconfig-ds                            # read-write credential override (committed, token from env)
 ├── aliases.sh                              # shell prompt + helpers, baked into the image
+├── gh-wrapper.sh                           # token-aware gh wrapper, installed at /usr/local/bin/gh
 ├── .gitignore
 └── .claude/                                # tool permissions for the host-side Claude Code
 ```
