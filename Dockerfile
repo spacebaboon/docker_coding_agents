@@ -12,6 +12,16 @@ ENV DEBIAN_FRONTEND=noninteractive
 # still work. Use DISABLE_UPDATES=1 instead to block those too.
 ENV DISABLE_AUTOUPDATER=1
 
+# Newer git than Noble's 2.43, so `git worktree add --relative-paths` works in the
+# container too - worktrees created on either side then resolve on both (host paths
+# /Users/... and container paths /workspace/... differ, relative links bridge them).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends software-properties-common \
+    && add-apt-repository -y ppa:git-core/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Node.js 22 (Playwright image has 18, we want newer for Claude Code)
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
