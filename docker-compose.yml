@@ -9,8 +9,16 @@ services:
     tty: true
     environment:
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-      - GITHUB_PERSONAL_ACCESS_TOKEN
-      - GH_TOKEN=$GITHUB_PERSONAL_ACCESS_TOKEN
+      # Two scoped GitHub tokens, host-side source of truth in .env. No single
+      # ambient token: the MCP servers (claude.json) and the gh/git credential
+      # helpers each select the right one by context.
+      #   GH_TOKEN_RW - read-write, your push-enabled project tree
+      #   GH_TOKEN_RO - read-only, the safe default everywhere else
+      - GH_TOKEN_RW
+      - GH_TOKEN_RO
+      # Absolute in-container path of the read-write tree; the gh wrapper in
+      # aliases.sh uses it to pick the token.
+      - GH_RW_TREE
       - CLAUDE_CONFIG_DIR=/home/claude/.claude
     group_add:
       - "0" # root group — required for Docker socket access on Docker Desktop for Mac
@@ -22,9 +30,10 @@ services:
       # docker-compose.override.yml.example.
       # Persist Claude settings/history between sessions
       - claude-config:/home/claude/.claude
-      # Git & SSH configs
-      - ~/.gitconfig:/home/claude/.gitconfig:ro
-      - ~/.ssh:/home/claude/.ssh:ro
+      # NB: the host ~/.gitconfig and ~/.ssh are deliberately NOT mounted. The
+      # container carries no personal GitHub credentials; git and gh authenticate
+      # via the two scoped tokens above, using a baked, directory-aware ~/.gitconfig
+      # credential helper (see gitconfig / gitconfig-ds, COPYed in the Dockerfile).
       # Humanlayer slash commands (read-only, managed on Mac)
       - ~/.claude/commands:/home/claude/.claude/commands:ro
       # Custom user-level Claude memory, managed on the Mac and gitignored in this

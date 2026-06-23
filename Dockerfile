@@ -43,7 +43,7 @@ RUN apt-get update \
     && ln -sf "$(which fdfind)" /usr/local/bin/fd \
     && ln -sf "$(which batcat)" /usr/local/bin/bat
 
-# Python toolchain for backend (laas-api) work — the Playwright base image is
+# Python toolchain for backend work — the Playwright base image is
 # Node-only. python-is-python3 puts `python` on PATH alongside `python3`.
 # Note: Ubuntu Noble marks the system Python as externally managed (PEP 668),
 # so prefer uv (below) for installs rather than `pip install` into the system.
@@ -129,14 +129,22 @@ RUN echo '{"colorscheme": "bubblegum"}' > /home/claude/.config/micro/settings.js
 # directory, so it is not shadowed.
 # Servers (see claude.json for definitions):
 #   playwright, chrome-devtools : local stdio (npx)
-#   github                      : stdio via the mounted Docker socket; PAT passed
-#                                 through GITHUB_PERSONAL_ACCESS_TOKEN, read-only
+#   github-rw / github-ro       : stdio via the mounted Docker socket; each pinned
+#                                 to its scoped PAT (GH_TOKEN_RW / GH_TOKEN_RO)
 #   atlassian, figma, locize    : remote OAuth; authenticate once with /mcp
-# No secrets live in this file (PAT is injected at runtime, the rest use OAuth),
+# No secrets live in this file (PATs are injected at runtime, the rest use OAuth),
 # so it is safe to commit. NOTE: this is baked into the image, so a container
 # recreate resets ~/.claude.json to these definitions; treat claude.json as the
 # source of truth and re-run /mcp auth for the OAuth servers if needed.
 COPY --chown=claude:claude claude.json /home/claude/.claude.json
+
+# Baked, directory-aware git config (the host ~/.gitconfig is no longer mounted).
+# Identity plus token-based HTTPS auth: read-only token by default, read-write token
+# inside the read-write project tree, and an SSH->HTTPS rewrite so token auth applies
+# to SSH-style remotes. gitconfig is git-ignored per-dev (copy from gitconfig.example);
+# gitconfig-ds is the committed read-write override (its token comes from the env).
+COPY --chown=claude:claude gitconfig /home/claude/.gitconfig
+COPY --chown=claude:claude gitconfig-ds /home/claude/.gitconfig-ds
 
 WORKDIR /workspace
 

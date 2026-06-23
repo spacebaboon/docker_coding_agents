@@ -1,0 +1,7 @@
+# Overrides the read-only default in ~/.gitconfig with the READ-WRITE token.
+# Included only inside the read-write project tree (see the includeIf in ~/.gitconfig).
+# Generic: the token comes from the environment, so this file holds no secrets and is
+# committed as-is.
+[credential "https://github.com"]
+	helper =
+	helper = "!f() { echo username=x-access-token; echo \"password=$GH_TOKEN_RW\"; }; f"
