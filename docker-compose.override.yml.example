@@ -9,7 +9,7 @@
 # thousands of small files. A named volume keeps node_modules on the
 # container's native ext4 filesystem — orders of magnitude faster.
 #
-# After editing, run `npm/bun install` inside the container once to populate
+# After editing, run `pnpm install` inside the container once to populate
 # each named volume.
 
 services:

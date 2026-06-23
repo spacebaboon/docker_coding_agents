@@ -42,7 +42,7 @@ Follow the instructions in this file in preference to project-specific CLAUDE.md
 
 > _List the MCP servers and tools configured for your container, and when the agent should use each. The list below matches the servers in this repo's `claude.json`; trim it to what you actually use._
 
-- GitHub MCP server: use this for repository inspection rather than the `gh` CLI. (Read-only, per the boundaries above.)
+- GitHub: use the `gh` CLI for repository inspection (it is pre-authenticated, token-aware by directory, and cheap on context). A GitHub MCP server is optional - add one only if you need structured PR/review queries.
 - Issue tracker MCP server (for example Jira): use when given a ticket reference.
 - Design MCP server (for example Figma): use when given a design reference.
 - Browser MCP server (for example Playwright): use to test UI changes.

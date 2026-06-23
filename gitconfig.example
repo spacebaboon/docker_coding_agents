@@ -1,0 +1,31 @@
+# Container git config (baked into the image; the host ~/.gitconfig is not mounted).
+# Identity + token-based GitHub auth over HTTPS using the two scoped tokens from the
+# environment. Copy to `gitconfig` (git-ignored) and fill in your identity and the
+# read-write tree path before building.
+
+[user]
+	name = Your Name
+	email = you@example.com
+[init]
+	defaultBranch = main
+[safe]
+	directory = *
+
+# The container has no SSH keys. Route SSH-style GitHub remotes over HTTPS so the
+# token credential helper below authenticates them too.
+[url "https://github.com/"]
+	insteadOf = git@github.com:
+	insteadOf = ssh://git@github.com/
+
+# Default credential for github.com: the READ-ONLY token (the safe default for every
+# repo). The empty first value clears any inherited helper so only this one runs.
+# $GH_TOKEN_RO is read from the environment when the helper runs.
+[credential "https://github.com"]
+	helper =
+	helper = "!f() { echo username=x-access-token; echo \"password=$GH_TOKEN_RO\"; }; f"
+
+# Inside the read-write project tree only, switch to the READ-WRITE token. Set this
+# to the absolute in-container path of that tree (the same path as GH_RW_TREE in
+# .env). Keyed on the exact path so sibling repos keep the read-only default.
+[includeIf "gitdir:/workspace/path/to/your/rw-project/"]
+	path = ~/.gitconfig-ds

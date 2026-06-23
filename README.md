@@ -1,6 +1,6 @@
 # docker_coding_agents
 
-A Docker container for safely running agentic coding CLIs — **Claude Code**, **OpenAI Codex**, and **Gemini** — alongside MCP servers for **Playwright**, **Chrome DevTools**, **GitHub**, **Jira/Confluence**, **Figma**, and **Locize**.
+A Docker container for safely running agentic coding CLIs — **Claude Code**, **OpenAI Codex**, and **Gemini** — alongside MCP servers for **Playwright**, **Chrome DevTools**, **Jira/Confluence**, **Figma**, and **Locize** (GitHub is handled via the `gh` CLI).
 
 **TL;DR** run Claude Code (et al) in YOLO mode to remove the constant hand-holding of approving commands, but don't let it nuke your home directory or GitHub main.
 
@@ -14,13 +14,12 @@ The goal is to give an agent broad freedom to read, write, and execute inside a 
 - **MCP servers** preconfigured for Claude Code (see [MCP servers](#mcp-servers-claudejson)):
   - `playwright` — browser automation via accessibility snapshots
   - `chrome-devtools` — performance profiling, network inspection, console debugging
-  - `github` — repositories, issues, PRs, build status (read-only, via the mounted Docker socket)
   - `atlassian` — Jira and Confluence (remote, OAuth)
   - `figma` — design context (remote, OAuth)
   - `locize` — translation strings (remote, OAuth)
 - **Runtimes**: Node.js 22, Bun, pnpm (via Corepack), Playwright's bundled Chromium
 - **Tooling**: Docker CLI (via socket mount), GitHub CLI (`gh`), AWS CLI v2, git, git-crypt, TypeScript & Python (Pyright) language servers, micro, vim, less, make, bash-completion
-- **Quality of life**: colored prompt with git branch, prompt-history helpers (`np` / `ep` / `lp` / `rp`), a `dangerclaude` alias for `claude --dangerously-skip-permissions`
+- **Quality of life**: colored prompt with git branch, prompt-history helpers (`np` / `ep` / `lp` / `rp`), a `dangerclaude` alias for `claude --dangerously-skip-permissions`, host-managed user skills mounted in (e.g. swappable [spinner verb packs](#custom-spinner-verbs))
 
 ## Safety model
 
@@ -30,7 +29,7 @@ The goal is to give an agent broad freedom to read, write, and execute inside a 
 - **16 GB memory cap**.
 - **No host filesystem access** beyond the directories mounted in `docker-compose.yml`.
 
-Note: the Docker socket is mounted so the agent (and the `github` MCP server) can use docker-in-docker. This is convenient but does give the container control of the host Docker daemon, so it is not a hard security boundary — treat it as part of the trust you extend to the tools you run.
+Note: the Docker socket is mounted so the agent can use docker-in-docker. This is convenient but does give the container control of the host Docker daemon, so it is not a hard security boundary — treat it as part of the trust you extend to the tools you run.
 
 ## Performance
 
@@ -39,14 +38,16 @@ Note: the Docker socket is mounted so the agent (and the `github` MCP server) ca
 ## Quick start
 
 ```bash
-# 1. Configure host paths and your GitHub token
+# 1. Configure host paths and your GitHub tokens
 cp .env.example .env
-$EDITOR .env                            # set PROJECTS_DIR and GITHUB_PERSONAL_ACCESS_TOKEN
+$EDITOR .env                            # set PROJECTS_DIR, GH_TOKEN_RW, GH_TOKEN_RO, GH_RW_TREE
 
 # 2. Create your working copies of the git-ignored config files
 cp CLAUDE.md.example CLAUDE.md          # user-level agent memory (must exist before `up`)
 cp claude.json.example claude.json      # MCP server definitions (must exist before `build`)
+cp gitconfig.example gitconfig          # baked git identity + token auth (must exist before `build`)
 $EDITOR CLAUDE.md                       # tweak to taste
+$EDITOR gitconfig                       # set your name/email and the read-write tree path (match GH_RW_TREE)
 
 # 3. (Optional) set up per-project node_modules volumes
 cp docker-compose.override.yml.example docker-compose.override.yml
@@ -75,8 +76,10 @@ Created from `.env.example`. Sets host-side values used by `docker-compose.yml`.
 
 | Variable                       | Default       | Purpose                                                                                                                                                                                     |
 | ------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PROJECTS_DIR`                 | `../projects` | Host directory mounted at `/workspace` inside the container. Can be absolute or relative to `docker-compose.yml`.                                                                           |
-| `GITHUB_PERSONAL_ACCESS_TOKEN` | _(none)_      | Passed through to the container for the `github` MCP server. A **read-only fine-grained** PAT is recommended (matches the read-only GitHub policy). Set it here or export it in your shell. |
+| `PROJECTS_DIR` | `../projects` | Host directory mounted at `/workspace` inside the container. Can be absolute or relative to `docker-compose.yml`. |
+| `GH_TOKEN_RW`  | _(none)_      | **Read-write** fine-grained PAT, scoped to the project tree you want the agent to push to. |
+| `GH_TOKEN_RO`  | _(none)_      | **Read-only** fine-grained PAT, the safe default for every other repo. |
+| `GH_RW_TREE`   | _(none)_      | Absolute in-container path (under `/workspace`) of the read-write tree. The `gh` wrapper and the baked git config use the read-write token there and the read-only token elsewhere. |
 
 The `.env` file is git-ignored, so each user keeps their own.
 
@@ -93,12 +96,12 @@ $EDITOR CLAUDE.md
 
 ### MCP servers (`claude.json`)
 
-MCP servers are defined as config-as-code in `claude.json`, copied into the image at `~/.claude.json` — the user-scope location Claude Code actually reads. (`~/.claude/` is shadowed by the `claude-config` volume, so MCP config placed there does not take effect.) No secrets live in it: the GitHub PAT is injected at runtime via `GITHUB_PERSONAL_ACCESS_TOKEN`, and the remote servers use OAuth.
+MCP servers are defined as config-as-code in `claude.json`, copied into the image at `~/.claude.json` — the user-scope location Claude Code actually reads. (`~/.claude/` is shadowed by the `claude-config` volume, so MCP config placed there does not take effect.) No secrets live in it: the remote servers use OAuth.
 
 `claude.json` is git-ignored (your working copy); `claude.json.example` is the committed baseline — copy it on first setup (`cp claude.json.example claude.json`). **It must exist before you build**, since the Dockerfile copies it into the image.
 
 - **`playwright`**, **`chrome-devtools`** — local stdio servers; work out of the box.
-- **`github`** — runs the official `ghcr.io/github/github-mcp-server` as a stdio server over the mounted Docker socket, authenticated with `GITHUB_PERSONAL_ACCESS_TOKEN` and started read-only. The first GitHub call pulls that image once.
+- **GitHub** — not exposed as an MCP server by default, to keep session context lean. Use the `gh` CLI instead: it is pre-authenticated and token-aware by directory (read-write in the read-write tree, read-only elsewhere), matching the baked git config. If you want structured MCP access, add `github-rw` / `github-ro` servers running `ghcr.io/github/github-mcp-server` pinned to `GH_TOKEN_RW` / `GH_TOKEN_RO` (the read-only one with `GITHUB_READ_ONLY=1`).
 - **`atlassian`** (Jira/Confluence), **`figma`**, **`locize`** — remote servers using OAuth. Authenticate once per `claude-config` volume: run `claude`, type `/mcp`, and complete the browser login for each. Credentials persist in the volume, so you don't repeat this on rebuild.
 
 Check status any time with `claude mcp list`. Because `~/.claude.json` is baked into the image, recreating the container resets it to whatever `claude.json` held at build time — edit `claude.json` and rebuild to add servers, rather than relying on runtime `claude mcp add`.
@@ -133,13 +136,47 @@ This file is git-ignored, so each user maintains their own list of projects.
 | ----------------------- | -------------------------------- | -------------------------------------------- |
 | `${PROJECTS_DIR}`       | `/workspace`                     | Your projects directory                      |
 | `./CLAUDE.md`           | `/home/claude/.claude/CLAUDE.md` | read-only — user-level agent memory          |
-| `~/.gitconfig`          | `/home/claude/.gitconfig`        | read-only                                    |
-| `~/.ssh`                | `/home/claude/.ssh`              | read-only — for git over SSH                 |
 | `~/.claude/commands`    | `/home/claude/.claude/commands`  | read-only — humanlayer slash commands        |
+| `~/.claude/skills`      | `/home/claude/.claude/skills`    | read-only — host-managed user skills         |
 | `~/thoughts`            | `/home/claude/thoughts`          | persistent agent notes                       |
 | `~/prompts`             | `/home/claude/prompts`           | prompt history (used by `np`/`ep`/`lp`/`rp`) |
 | `/var/run/docker.sock`  | `/var/run/docker.sock`           | docker-in-docker via host daemon             |
 | `claude-config` (named) | `/home/claude/.claude`           | persists Claude settings/history/MCP logins  |
+
+Git auth is not mounted. A directory-aware `~/.gitconfig` is baked into the image (see `gitconfig` / `gitconfig-ds`): it uses the read-only token by default and the read-write token inside the read-write tree. The container holds no SSH keys — SSH-style GitHub remotes are rewritten to HTTPS so the token credential helper authenticates them.
+
+## Custom spinner verbs
+
+The verbs Claude Code shows while it works (`Thinking…`, `Analyzing…`) can be
+swapped for themed packs (pirate, superhero, wizard, …) from
+[awesome-claude-spinners](https://github.com/AlexPl292/awesome-claude-spinners),
+via that repo's `install-spinner` skill.
+
+Skills are managed on the **Mac** and mounted read-only into the container at
+`~/.claude/skills` (the same pattern as the slash commands). Install the skill once
+on the host:
+
+```bash
+npx --yes skills@latest add alexpl292/awesome-claude-spinners \
+    --global --agent claude-code --skill install-spinner --copy --yes
+```
+
+`--copy` writes real files (not symlinks) to `~/.claude/skills/install-spinner`, so
+the read-only container mount resolves them. The skill is then available in both your
+host **and** container Claude Code.
+
+To use it, in a Claude Code session just ask:
+
+```
+install the pirate spinner pack          # or superhero, wizard, cat, …
+remove the spinner pack                  # revert to the defaults
+```
+
+The skill fetches the pack from GitHub and writes the chosen verbs to the
+`spinnerVerbs` field of `~/.claude/settings.json`. Because that file lives in the
+`claude-config` volume, your pick **persists across rebuilds**, and only that one
+field is touched. (Needs the network, which the container has, and a Claude Code
+build new enough to support `spinnerVerbs`.)
 
 ## Writing longer prompts (`np` / `ep` / `lp` / `rp`)
 
@@ -207,6 +244,9 @@ docker compose exec claude rm -f /home/claude/.claude/scheduled_tasks.lock
 ├── claude.json                             # your MCP config (git-ignored, copied from the example)
 ├── CLAUDE.md.example                       # user-level agent memory template (committed)
 ├── CLAUDE.md                               # your personal agent memory (git-ignored, copied from the example)
+├── gitconfig.example                       # baked git identity/credential template (committed)
+├── gitconfig                               # your git config (git-ignored, copied from the example)
+├── gitconfig-ds                            # read-write credential override (committed, token from env)
 ├── aliases.sh                              # shell prompt + helpers, baked into the image
 ├── .gitignore
 └── .claude/                                # tool permissions for the host-side Claude Code

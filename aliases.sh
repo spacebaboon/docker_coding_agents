@@ -47,6 +47,15 @@ alias gitd='git diff'
 alias gitl='git log --oneline -20'
 
 # GitHub CLI
+# Pick the GitHub token by working tree: inside the read-write project tree
+# (GH_RW_TREE) use the read-write token; everywhere else use the read-only token,
+# the safe default. Mirrors the git credential setup in ~/.gitconfig.
+gh() {
+  case "$PWD/" in
+    "${GH_RW_TREE:-__no_rw_tree__}"/*) GH_TOKEN="$GH_TOKEN_RW" command gh "$@" ;;
+    *) GH_TOKEN="$GH_TOKEN_RO" command gh "$@" ;;
+  esac
+}
 alias gl='gh repo list'
 alias gp='gh pr view --web'
 
