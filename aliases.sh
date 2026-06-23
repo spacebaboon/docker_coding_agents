@@ -86,51 +86,108 @@ rp() {
 # Create a git worktree as a sibling of the main checkout, named after the branch.
 # Handles git-crypt key linking automatically. Needs bash or zsh.
 # Usage: wt <branch-name> [--install]
-wt() {
-  local branch="$1"
-  if [ -z "$branch" ]; then
-    echo "usage: wt <branch-name> [--install]" >&2
-    return 1
-  fi
+wt () {
+    local branch="$1"
+    shift || true
 
-  # directory name = branch with any slashes flattened (slashes would nest dirs)
-  local dirname="${branch//\//-}"
+    if [ -z "$branch" ]; then
+        echo "usage: wt <branch-name> [--install] [--no-reset]" 1>&2
+        return 1
+    fi
 
-  # place it next to the MAIN checkout, wherever we are in the repo
-  local toplevel parent target
-  toplevel="$(git rev-parse --show-toplevel)" || return 1
-  parent="$(dirname "$toplevel")"
-  target="$parent/$dirname"
+    local do_install="false"
+    local do_reset="true"
 
-  if [ -e "$target" ]; then
-    echo "wt: '$target' already exists" >&2
-    return 1
-  fi
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --install)
+                do_install="true"
+                ;;
+            --no-reset)
+                do_reset="false"
+                ;;
+            *)
+                echo "wt: unknown option '$1'" 1>&2
+                echo "usage: wt <branch-name> [--install] [--no-reset]" 1>&2
+                return 1
+                ;;
+        esac
+        shift
+    done
 
-  # create WITHOUT checking out, so git-crypt's smudge filter doesn't run
-  # before we've linked the key into the new worktree's git dir
-  if git show-ref --quiet --verify "refs/heads/$branch"; then
-    git worktree add --no-checkout "$target" "$branch" || return 1
-  else
-    git worktree add --no-checkout "$target" -b "$branch" || return 1
-  fi
+    local dirname="${branch//\//-}"
+    local toplevel parent target
 
-  # link the git-crypt key (only if this repo uses git-crypt)
-  local common_dir wt_gitdir
-  common_dir="$(cd "$(git rev-parse --git-common-dir)" && pwd)"   # absolute
-  wt_gitdir="$(git -C "$target" rev-parse --absolute-git-dir)"
-  if [ -d "$common_dir/git-crypt" ] && [ ! -e "$wt_gitdir/git-crypt" ]; then
-    ln -s "$common_dir/git-crypt" "$wt_gitdir/git-crypt"
-  fi
+    toplevel="$(git rev-parse --show-toplevel)" || return 1
+    parent="$(dirname "$toplevel")"
+    target="$parent/$dirname"
 
-  # now populate the working tree — smudge can decrypt cleanly
-  git -C "$target" reset --hard || return 1
+    if [ -e "$target" ]; then
+        echo "wt: '$target' already exists" 1>&2
+        return 1
+    fi
 
-  cd "$target" || return 1
+    # Create the worktree using relative paths so it works across host/container
+    # as long as the relative directory layout is the same on both sides.
+    if git show-ref --quiet --verify "refs/heads/$branch"; then
+        git worktree add --relative-paths --no-checkout "$target" "$branch" || return 1
+    elif git show-ref --quiet --verify "refs/remotes/origin/$branch"; then
+        git worktree add --relative-paths --no-checkout -b "$branch" "$target" "origin/$branch" || return 1
+    else
+        git worktree add --relative-paths --no-checkout -b "$branch" "$target" || return 1
+    fi
 
-  if [ "$2" = "--install" ]; then
-    pnpm install
-  else
-    echo "worktree ready at $target — run 'pnpm install' for deps"
-  fi
+    local common_dir wt_gitdir crypt_link
+
+    common_dir="$(cd "$(git rev-parse --git-common-dir)" && pwd)" || return 1
+    wt_gitdir="$(git -C "$target" rev-parse --absolute-git-dir)" || return 1
+    crypt_link="$wt_gitdir/git-crypt"
+
+    # git-crypt stores its key material in the common git dir.
+    # A linked worktree has its own gitdir under:
+    #
+    #   <common-dir>/worktrees/<id>
+    #
+    # so ../../git-crypt points back to:
+    #
+    #   <common-dir>/git-crypt
+    #
+    # This must be relative, otherwise either the host or container will see
+    # a broken absolute symlink.
+    if [ -d "$common_dir/git-crypt" ]; then
+        if [ -e "$crypt_link" ] || [ -L "$crypt_link" ]; then
+            rm "$crypt_link" || return 1
+        fi
+
+        case "$wt_gitdir" in
+            "$common_dir"/worktrees/*)
+                ln -s ../../git-crypt "$crypt_link" || return 1
+                ;;
+            *)
+                echo "wt: unexpected worktree gitdir location:" 1>&2
+                echo "    $wt_gitdir" 1>&2
+                echo "wt: expected it to be under:" 1>&2
+                echo "    $common_dir/worktrees" 1>&2
+                echo "wt: not creating git-crypt symlink" 1>&2
+                ;;
+        esac
+    fi
+
+    if [ "$do_reset" = "true" ]; then
+        git -C "$target" reset --hard || return 1
+    else
+        echo "worktree created at $target without checkout/reset"
+        echo "run this in the environment where git-crypt works:"
+        echo
+        echo "  git -C \"$target\" reset --hard"
+        echo
+    fi
+
+    cd "$target" || return 1
+
+    if [ "$do_install" = "true" ]; then
+        pnpm install
+    else
+        echo "worktree ready at $target — run 'pnpm install' for deps"
+    fi
 }
