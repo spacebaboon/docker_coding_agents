@@ -19,7 +19,11 @@ services:
       # Absolute in-container path of the read-write tree; the gh wrapper script
       # uses it to pick the token.
       - GH_RW_TREE
-      - CLAUDE_CONFIG_DIR=/home/claude/.claude
+      # Do NOT set CLAUDE_CONFIG_DIR. It defaults to ~/.claude (the volume below),
+      # which is what we want for settings/history/credentials. Setting it also
+      # redirects the *main* config to $CLAUDE_CONFIG_DIR/.config.json (inside the
+      # volume), which shadows the baked ~/.claude.json and silently ignores
+      # claude.json - so MCP server edits never take effect on recreate.
     group_add:
       - "0" # root group — required for Docker socket access on Docker Desktop for Mac
     volumes:
