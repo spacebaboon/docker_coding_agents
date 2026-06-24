@@ -139,10 +139,12 @@ RUN mkdir -p /home/claude/.config/micro
 RUN echo '{"colorscheme": "bubblegum"}' > /home/claude/.config/micro/settings.json
 
 # Configure MCP servers for Claude Code.
-# These go in ~/.claude.json (user scope), NOT ~/.claude/.config.json — the latter
-# is not a path Claude Code reads, and ~/.claude is mounted over by the
-# claude-config named volume anyway. ~/.claude.json is a *sibling* of that
-# directory, so it is not shadowed.
+# These go in ~/.claude.json (user scope). ~/.claude.json is a *sibling* of the
+# ~/.claude directory, which the claude-config named volume mounts over, so the
+# baked file is not shadowed. IMPORTANT: this only works while CLAUDE_CONFIG_DIR
+# is unset - setting it (e.g. to ~/.claude) redirects the main config to
+# $CLAUDE_CONFIG_DIR/.config.json inside the volume, which shadows this file and
+# makes claude.json a no-op. See the note in docker-compose.yml.
 # Servers (see claude.json for definitions):
 #   playwright, chrome-devtools : local stdio (npx)
 #   atlassian, figma, locize    : remote OAuth; authenticate once with /mcp
