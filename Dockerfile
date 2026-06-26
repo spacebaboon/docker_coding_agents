@@ -1,16 +1,19 @@
 # Base: Official Playwright image with browsers pre-installed
-FROM mcr.microsoft.com/playwright:v1.60.0-noble
+FROM mcr.microsoft.com/playwright:v1.61.1-noble
 
 # Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Disable Claude Code's background self-updater. In a container the global
-# install lives in a root-owned prefix, so the autoupdater fails partway and
-# leaves a stale ~/.claude/scheduled_tasks.lock ("Another instance is currently
-# performing an update"). Updates here happen by rebuilding the image instead.
-# Note: this stops the background check only; `claude update`/`claude install`
-# still work. Use DISABLE_UPDATES=1 instead to block those too.
-ENV DISABLE_AUTOUPDATER=1
+# Claude Code's background self-updater is left ENABLED. Previously it was
+# disabled because the global install lived in a root-owned prefix, so the
+# updater failed partway and left a stale ~/.claude/scheduled_tasks.lock
+# ("Another instance is currently performing an update"). We now install Claude
+# Code per-user into /home/claude/.npm-global (a user-owned prefix, see below)
+# and put that bin dir first on PATH, so the updater can write successfully and
+# the running `claude` is the updated one. The container keeps itself current
+# without bumping a version on every release; a rebuild resets to whatever
+# @latest resolved to at build time. To block updates entirely, set
+# DISABLE_UPDATES=1 (stops `claude update`/`claude install` too).
 
 # Newer git than Noble's 2.43, so `git worktree add --relative-paths` works in the
 # container too - worktrees created on either side then resolve on both (host paths
@@ -27,11 +30,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Claude Code, Playwright MCP, Chrome DevTools MCP, Codex CLI, Gemini CLI, and HumanLayer
-# @latest pulls the newest version at build time. Opus 4.8 needs Claude Code
-# >= 2.1.154, so rebuild this image to pick it up (or pin a version here).
+# Install Playwright MCP, Chrome DevTools MCP, Codex CLI, Gemini CLI, HumanLayer,
+# and TS/Python language tooling globally (root prefix). Claude Code is NOT here -
+# it is installed per-user further down (after USER claude) so its self-updater
+# can write to a user-owned prefix instead of this root-owned one.
 RUN npm install -g \
-    @anthropic-ai/claude-code@latest \
     @playwright/mcp@latest \
     chrome-devtools-mcp@latest \
     @openai/codex@latest \
@@ -121,9 +124,18 @@ RUN chown claude:claude /home/claude/.aliases.sh \
 
 USER claude
 
+# Put the user-owned npm prefix and ~/.local/bin FIRST on PATH. This is what makes
+# `claude update` actually take effect: the updater installs into ~/.npm-global,
+# and because that bin dir precedes /usr/bin, the updated binary is the one that
+# runs (no stale system copy shadowing it).
 ENV NPM_CONFIG_PREFIX=/home/claude/.npm-global
-ENV PATH=$PATH:/home/claude/.npm-global/bin:/home/claude/.local/bin
+ENV PATH=/home/claude/.npm-global/bin:/home/claude/.local/bin:$PATH
 RUN mkdir -p /home/claude/.npm-global
+
+# Install Claude Code per-user, into the user-owned prefix set above, so the
+# background self-updater can write to it. @latest pulls the newest at build time;
+# the updater keeps it current thereafter. (Opus 4.8 needs >= 2.1.154.)
+RUN npm install -g @anthropic-ai/claude-code@latest
 
 # Install Bun as the claude user (will go to /home/claude/.bun)
 RUN curl -fsSL https://bun.sh/install | bash
